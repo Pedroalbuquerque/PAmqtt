@@ -64,14 +64,15 @@ void mqttBuildTopic(char * topic,uint8_t nodeID, const char* subtopic){
   return;
 }
 
-void mqttPublish(const char *topic,  char *payload){
+uint16_t mqttPublish(const char *topic,  char *payload){
   //mqttClient.publish(const char *topic, uint8_t qos, bool retain, optional const char *payload, optional size_t length)
   DEBUG_MSG("[mqtt]publish %s\tqos:%d\t payload:%s\n", topic, MQTT_QOS,payload);
   if(mqttClient.connected())
-    mqttClient.publish(topic, MQTT_QOS, MQTT_RETAIN, payload, strlen(payload));
+    return mqttClient.publish(topic, MQTT_QOS, MQTT_RETAIN, payload, strlen(payload));
   else {
     DEBUG_MSG("[mqtt] Mqtt not connected , not published")
   }
+  return 0;
 }
 
 void mqttSubscribe(const char *topic, uint8_t qos){
@@ -162,26 +163,24 @@ void mqttSetup() {
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onSubscribe(onMqttSubscribe);
   mqttClient.onUnsubscribe(onMqttUnsubscribe);
-  //mqttClient.onMessage(onMqttMessage);
+  mqttClient.onMessage(onMqttMessage);
   mqttClient.onPublish(onMqttPublish);
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
 
 
 }
 
-void mqttPubStatus( char * message) {
+uint16_t mqttPubStatus( char * message) {
       char topic[50];
       mqttBuildTopic(topic, NODEID,MQTT_SUBTOPIC_STATUS);
       //DEBUG_MSG("[mqtt loop] topic:%s:%s\n",topic,buf);
-      mqttPublish(topic ,message);
+      return mqttPublish(topic ,message);
 }
 
 void mqttPubDebug( char * message ){
   char topic[50];
   mqttBuildTopic(topic, NODEID,MQTT_SUBTOPIC_DBG);
   mqttPublish(topic ,message);
-
-
 }
 
 //#endif
