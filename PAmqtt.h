@@ -69,8 +69,10 @@ uint16_t mqttPublish(const char *topic,  char *payload){
   DEBUG_MSG("[mqtt]publish %s\tqos:%d\t payload:%s\n", topic, MQTT_QOS,payload);
   if(!mqttClient.connected()){
     Esp.WiFiconnect();
-    mqttClient.connect();
   }
+  
+  if(!mqttClient.connected()) mqttClient.connect();
+
   if(mqttClient.connected())
     return mqttClient.publish(topic, MQTT_QOS, MQTT_RETAIN, payload, strlen(payload));
   else {    
@@ -98,7 +100,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
   DEBUG_MSG("[mqtt]Disconnected from MQTT.\n");
 
   if (WiFi.isConnected()) {
-    mqttReconnectTimer.once(2, connectToMqtt);
+    //mqttReconnectTimer.once(2, connectToMqtt);
   }
 }
 
