@@ -10,6 +10,7 @@ Ticker wifiReconnectTimer;
 
 void connectToMqtt() {
   DEBUG_MSG("[mqtt] Connecting to MQTT...");
+  mqttClient.setCredentials(MQTT_USER,MQTT_PASS);
   mqttClient.connect();
 }
 
@@ -100,7 +101,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
   DEBUG_MSG("[mqtt]Disconnected from MQTT.\n");
 
   if (WiFi.isConnected()) {
-    //mqttReconnectTimer.once(2, connectToMqtt);
+    mqttReconnectTimer.once(2, connectToMqtt);
   }
 }
 
