@@ -10,6 +10,7 @@ Ticker wifiReconnectTimer;
 
 void connectToMqtt() {
   DEBUG_MSG("[mqtt] Connecting to MQTT...");
+  mqttClient.setCredentials(MQTT_USER,MQTT_PASS);
   mqttClient.connect();
 }
 
