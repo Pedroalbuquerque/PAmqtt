@@ -65,14 +65,21 @@ void mqttBuildTopic(char * topic,uint8_t nodeID, const char* subtopic){
   return;
 }
 
-void mqttPublish(const char *topic,  char *payload){
+uint16_t mqttPublish(const char *topic,  char *payload){
   //mqttClient.publish(const char *topic, uint8_t qos, bool retain, optional const char *payload, optional size_t length)
   DEBUG_MSG("[mqtt]publish %s\tqos:%d\t payload:%s\n", topic, MQTT_QOS,payload);
+  if(!mqttClient.connected()){
+    Esp.WiFiconnect();
+  }
+  
+  if(!mqttClient.connected()) mqttClient.connect();
+
   if(mqttClient.connected())
-    mqttClient.publish(topic, MQTT_QOS, MQTT_RETAIN, payload, strlen(payload));
-  else {
+    return mqttClient.publish(topic, MQTT_QOS, MQTT_RETAIN, payload, strlen(payload));
+  else {    
     DEBUG_MSG("[mqtt] Mqtt not connected , not published")
   }
+  return 0;
 }
 
 void mqttSubscribe(const char *topic, uint8_t qos){
@@ -110,21 +117,32 @@ void onMqttUnsubscribe(uint16_t packetId) {
 }
 
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-  uint8_t nodeID, start, end;
+  uint8_t nodeID, start, end, topiclen;
   String tmpStr;
+  String tmpTopic;
+  char tmpPayload[50];
   tmpStr = String(topic);
+  topiclen = strlen(tmpStr.c_str());
   end = tmpStr.lastIndexOf("/");
   start = tmpStr.lastIndexOf("/",end-1);
   nodeID = atoi(tmpStr.substring(start+1, end).c_str());
+  tmpTopic = tmpStr.substring(end+1,topiclen);
+  strncpy(tmpPayload,payload,len);
+  tmpPayload[len] = NULL;
+  
+  DEBUG_MSG("MQTT MSG] topicLen:%d\t len:%d\t total:%d\n",topiclen,len,total);
+  DEBUG_MSG("[MQTT MSG] nodeID:%d\ttopic:%s\t payload:%s\n",nodeID,tmpTopic.c_str(),tmpPayload);
 
-  DEBUG_MSG("[MQTT MSG] nodeID:%d\t payload:%s\n",nodeID,payload);
+  if(nodeID == NODEID){
+    if(strcmp(tmpTopic.c_str(),"CMD") == 0) {
+      DEBUG_MSG("[MQTT MSG] CMD rceived:%s\n",tmpPayload);
+    }
 
-  if((tmpStr.indexOf(MQTT_SUBTOPIC_CMD)!=-1) && (nodeID == NODEID)){
-
-
-      if(JsonDecode(payload)){  // if parsed OK
-        IO.outputSetAll();               // set output acording to CMD topic data
-      }
+    if(tmpStr.indexOf(MQTT_SUBTOPIC_CMD)!=-1){
+        if(JsonDecode(payload)){  // if parsed OK
+          //IO.outputSetAll();               // set output acording to CMD topic data
+        }
+    }
   }
 
   //DEBUG_MSG("Publish received.\n");
@@ -163,26 +181,39 @@ void mqttSetup() {
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onSubscribe(onMqttSubscribe);
   mqttClient.onUnsubscribe(onMqttUnsubscribe);
-  //mqttClient.onMessage(onMqttMessage);
+  mqttClient.onMessage(onMqttMessage);
   mqttClient.onPublish(onMqttPublish);
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
 
 
 }
 
-void mqttPubStatus( char * message) {
+void mqttShutDown(){
+  #ifdef ESP8266
+    wifiConnectHandler = NULL;
+    wifiDisconnectHandler = NULL;
+
+  #else //ESP32
+    // ?? WiFi.onEvent(onWifiConnect, SYSTEM_EVENT_STA_CONNECTED);
+    // ?? WiFi.onEvent(onWifiDisconnect, SYSTEM_EVENT_STA_DISCONNECTED);
+  #endif
+
+  WiFi.disconnect();
+  mqttClient.disconnect();
+
+}
+
+uint16_t mqttPubStatus( char * message) {
       char topic[50];
       mqttBuildTopic(topic, NODEID,MQTT_SUBTOPIC_STATUS);
       //DEBUG_MSG("[mqtt loop] topic:%s:%s\n",topic,buf);
-      mqttPublish(topic ,message);
+      return mqttPublish(topic ,message);
 }
 
 void mqttPubDebug( char * message ){
   char topic[50];
   mqttBuildTopic(topic, NODEID,MQTT_SUBTOPIC_DBG);
   mqttPublish(topic ,message);
-
-
 }
 
 //#endif
