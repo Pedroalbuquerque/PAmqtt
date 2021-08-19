@@ -10,7 +10,6 @@ Ticker wifiReconnectTimer;
 
 void connectToMqtt() {
   DEBUG_MSG("[mqtt] Connecting to MQTT...");
-  mqttClient.setCredentials(MQTT_USER,MQTT_PASS);
   mqttClient.connect();
 }
 
@@ -30,7 +29,7 @@ void connectToMqtt() {
 
   void onWifiDisconnect(const WiFiEventStationModeDisconnected& event) {
     DEBUG_MSG("[Wifi ST] Disconnected from Wi-Fi.");
-    delay(2000); //wait 2 sec and try again
+    delay(15000); //wait 15 sec and try again
     mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
     Esp.WiFiconnect(); // when wifi connect, mqtt will connect also
   }
@@ -68,7 +67,8 @@ void mqttBuildTopic(char * topic,uint8_t nodeID, const char* subtopic){
 uint16_t mqttPublish(const char *topic,  char *payload){
   //mqttClient.publish(const char *topic, uint8_t qos, bool retain, optional const char *payload, optional size_t length)
   DEBUG_MSG("[mqtt]publish %s\tqos:%d\t payload:%s\n", topic, MQTT_QOS,payload);
-  if(!mqttClient.connected()){
+  if(!config.connectToWifi) return 0;
+  if(!WiFi.isConnected()){
     Esp.WiFiconnect();
   }
   
@@ -164,8 +164,7 @@ void onMqttPublish(uint16_t packetId) {
   DEBUG_MSG("[mqtt on publish]  packetId: %d\n",packetId);
 }
 
-
-void mqttSetup() {
+void mqttSetup(char* mqttServer , char* mqttUser, char* mqttPwd) {
 
   #ifdef ESP8266
     wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
@@ -183,9 +182,13 @@ void mqttSetup() {
   mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.onPublish(onMqttPublish);
-  mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+  mqttClient.setServer(mqttServer, MQTT_PORT);
+  mqttClient.setCredentials(mqttUser,mqttPwd);
 
 
+}
+void mqttSetup() {
+  mqttSetup(MQTT_SERVER , MQTT_USER, MQTT_PASS);
 }
 
 void mqttShutDown(){
