@@ -128,7 +128,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   nodeID = atoi(tmpStr.substring(start+1, end).c_str());
   tmpTopic = tmpStr.substring(end+1,topiclen);
   strncpy(tmpPayload,payload,len);
-  tmpPayload[len] = NULL;
+  tmpPayload[len] = 0;
   
   DEBUG_MSG("MQTT MSG] topicLen:%d\t len:%d\t total:%d\n",topiclen,len,total);
   DEBUG_MSG("[MQTT MSG] nodeID:%d\ttopic:%s\t payload:%s\n",nodeID,tmpTopic.c_str(),tmpPayload);
@@ -188,7 +188,7 @@ void mqttSetup(char* mqttServer , char* mqttUser, char* mqttPwd) {
 
 }
 void mqttSetup() {
-  mqttSetup(MQTT_SERVER , MQTT_USER, MQTT_PASS);
+  mqttSetup((char*)MQTT_SERVER , (char*)MQTT_USER, (char*)MQTT_PASS);
 }
 
 void mqttShutDown(){
