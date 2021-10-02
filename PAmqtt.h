@@ -1,18 +1,45 @@
 
-#include <AsyncMqttClient.h>
+//#include <AsyncMqttClient.h>
+#include <PubSubClient.h>
 #include <Ticker.h>
 
-AsyncMqttClient mqttClient;
+//AsyncMqttClient mqttClient;
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+char _mqttUser[16], _mqttPwd[16];
 
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
 
+void mqttBuildTopic(char * topic,uint8_t nodeID, const char* subtopic){
+  String tmpTopic;
+  tmpTopic = String(MQTT_TOPIC) + String(subtopic);
+  tmpTopic.replace("{nodeid}",String(nodeID,DEC) );
+  strcpy(topic,tmpTopic.c_str());
+  //DEBUG_MSG("[mqttbuild]%s\n",tmpTopic.c_str());
+  return;
+}
+
+uint8_t mqttSubscribe(){
+  char buf[50];
+  mqttBuildTopic(buf,NODEID, MQTT_SUBTOPIC_CMD);
+  uint8_t status = mqttClient.subscribe(buf, 1);
+  DEBUG_MSG("[PAmqtt] subscribing topic:%s\tstatus:%d\n",buf,status);
+  return status;
+}
 
 void connectToMqtt() {
   DEBUG_MSG("[mqtt] Connecting to MQTT...");
-  mqttClient.connect();
+  mqttClient.connect("PAclientID",_mqttUser,_mqttPwd);
+  //mqttClient.connect();
+  uint32_t timeout = millis()+ 5000;
+  if(mqttClient.connected())  {
+    while(!mqttSubscribe() & (millis() < timeout)){
+      delay(500);
+      DEBUG_MSG(".");
+    }; // try to subscribe untill timeout
+  } ;
 }
-
 
 #ifdef ESP8266
   // for Esp8266 a trigger was implemented just when the connection is stablished by the client
@@ -55,40 +82,28 @@ void connectToMqtt() {
 
 #endif
 
-void mqttBuildTopic(char * topic,uint8_t nodeID, const char* subtopic){
-  String tmpTopic;
-  tmpTopic = String(MQTT_TOPIC) + String(subtopic);
-  tmpTopic.replace("{nodeid}",String(nodeID,DEC) );
-  strcpy(topic,tmpTopic.c_str());
-  //DEBUG_MSG("[mqttbuild]%s\n",tmpTopic.c_str());
-  return;
-}
 
 uint16_t mqttPublish(const char *topic,  char *payload){
   //mqttClient.publish(const char *topic, uint8_t qos, bool retain, optional const char *payload, optional size_t length)
-  DEBUG_MSG("[mqtt]publish %s\tqos:%d\t payload:%s\n", topic, MQTT_QOS,payload);
+  DEBUG_MSG("[mqtt]publish %s\t payload:%s\n", topic,payload);
   if(!config.connectToWifi) return 0;
   if(!WiFi.isConnected()){
     Esp.WiFiconnect();
   }
   
-  if(!mqttClient.connected()) mqttClient.connect();
+  if(!mqttClient.connected()) connectToMqtt();
 
   if(mqttClient.connected())
-    return mqttClient.publish(topic, MQTT_QOS, MQTT_RETAIN, payload, strlen(payload));
+    return mqttClient.publish(topic, payload);
+    //    return mqttClient.publish(topic, MQTT_QOS, MQTT_RETAIN, payload, strlen(payload));
   else {    
     DEBUG_MSG("[mqtt] Mqtt not connected , not published")
   }
   return 0;
 }
 
-void mqttSubscribe(const char *topic, uint8_t qos){
-  mqttClient.subscribe(topic, qos);
-  DEBUG_MSG("[mqtt]subscribe %s\tqos:%d\n", topic, qos);
-}
 
-
-
+/*
 void onMqttConnect(bool sessionPresent) {
   DEBUG_MSG("[mqtt] Connected to MQTT.\n");
   DEBUG_MSG("[mqtt] Session present: %d\n",sessionPresent);
@@ -116,7 +131,15 @@ void onMqttUnsubscribe(uint16_t packetId) {
   DEBUG_MSG("  packetId: %d\n",packetId);
 }
 
-void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+
+void onMqttPublish(uint16_t packetId) {
+  //DEBUG_MSG("[mqtt] Publish acknowledged.\n");
+  DEBUG_MSG("[mqtt on publish]  packetId: %d\n",packetId);
+}
+*/
+void onMqttMessage(char* topic, byte* bpayload, size_t len) {
+  char payload[100];
+  strncpy(payload,(char *)bpayload,len);
   uint8_t nodeID, start, end, topiclen;
   String tmpStr;
   String tmpTopic;
@@ -130,7 +153,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   strncpy(tmpPayload,payload,len);
   tmpPayload[len] = 0;
   
-  DEBUG_MSG("MQTT MSG] topicLen:%d\t len:%d\t total:%d\n",topiclen,len,total);
+  DEBUG_MSG("MQTT MSG] topicLen:%d\t len:%d\n",topiclen,len);
   DEBUG_MSG("[MQTT MSG] nodeID:%d\ttopic:%s\t payload:%s\n",nodeID,tmpTopic.c_str(),tmpPayload);
 
   if(nodeID == NODEID){
@@ -159,11 +182,6 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 
 }
 
-void onMqttPublish(uint16_t packetId) {
-  //DEBUG_MSG("[mqtt] Publish acknowledged.\n");
-  DEBUG_MSG("[mqtt on publish]  packetId: %d\n",packetId);
-}
-
 void mqttSetup(char* mqttServer , char* mqttUser, char* mqttPwd) {
 
   #ifdef ESP8266
@@ -176,16 +194,17 @@ void mqttSetup(char* mqttServer , char* mqttUser, char* mqttPwd) {
   #endif
 
 
-  mqttClient.onConnect(onMqttConnect);
-  mqttClient.onDisconnect(onMqttDisconnect);
-  mqttClient.onSubscribe(onMqttSubscribe);
-  mqttClient.onUnsubscribe(onMqttUnsubscribe);
-  mqttClient.onMessage(onMqttMessage);
-  mqttClient.onPublish(onMqttPublish);
+  //mqttClient.onConnect(onMqttConnect);
+  //mqttClient.onDisconnect(onMqttDisconnect);
+  //mqttClient.onSubscribe(onMqttSubscribe);
+  //mqttClient.onUnsubscribe(onMqttUnsubscribe);
+  //mqttClient.onMessage(onMqttMessage);
+  //mqttClient.onPublish(onMqttPublish);
   mqttClient.setServer(mqttServer, MQTT_PORT);
-  mqttClient.setCredentials(mqttUser,mqttPwd);
-
-
+  strcpy(_mqttUser,mqttUser);
+  strcpy(_mqttPwd,mqttPwd);
+  mqttClient.setCallback(onMqttMessage);
+  //mqttClient.setCredentials(mqttUser,mqttPwd);
 }
 void mqttSetup() {
   mqttSetup((char*)MQTT_SERVER , (char*)MQTT_USER, (char*)MQTT_PASS);
