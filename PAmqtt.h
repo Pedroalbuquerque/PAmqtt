@@ -30,7 +30,9 @@ uint8_t mqttSubscribe(){
 
 void connectToMqtt() {
   DEBUG_MSG("[mqtt] Connecting to MQTT...");
-  mqttClient.connect("PAclientID",_mqttUser,_mqttPwd);
+  String ID = "PA_IOT_" + String(getChipId(),HEX);
+  
+  mqttClient.connect(ID.c_str(),_mqttUser,_mqttPwd);
   //mqttClient.connect();
   uint32_t timeout = millis()+ 5000;
   if(mqttClient.connected())  {
